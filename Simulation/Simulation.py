@@ -10,25 +10,28 @@ from Car import Car
 width, height = 1500, 1000
 carSize = 30;
 
-roadCenter = [width/2, height/2]; # The center point of the road
+roadCenter = [width/1.5, height/2]; # The center point of the road
 roadWidth = 50; # The width of the road
 
 roadBoundaries = [[roadCenter[0], roadCenter[1]-roadWidth, 0, roadCenter[1]-roadWidth], # Upper lane boundarie
                   [roadCenter[0], roadCenter[1], 0, roadCenter[1]],                     # Midle lane boundarie
                   [roadCenter[0], roadCenter[1]+roadWidth, 0, roadCenter[1]+roadWidth], # Lower lane boundarie
-                  [roadCenter[0], roadCenter[1]-roadWidth, roadCenter[0]+roadWidth, roadCenter[1]-roadWidth/2], # Upper merge point
-                  [roadCenter[0], roadCenter[1]+roadWidth, roadCenter[0]+roadWidth, roadCenter[1]+roadWidth/2], # Lower merge point
-                  [roadCenter[0]+roadWidth, roadCenter[1]-roadWidth/2, width, roadCenter[1]-roadWidth/2], # New lane upper
-                  [roadCenter[0]+roadWidth, roadCenter[1]+roadWidth/2, width, roadCenter[1]+roadWidth/2]] # New lane lower
+                  [roadCenter[0], roadCenter[1]-roadWidth, roadCenter[0]+roadWidth*2, roadCenter[1]-roadWidth/2], # Upper merge point
+                  [roadCenter[0], roadCenter[1]+roadWidth, roadCenter[0]+roadWidth*2, roadCenter[1]+roadWidth/2], # Lower merge point
+                  [roadCenter[0]+roadWidth*2, roadCenter[1]-roadWidth/2, width, roadCenter[1]-roadWidth/2], # New lane upper
+                  [roadCenter[0]+roadWidth*2, roadCenter[1]+roadWidth/2, width, roadCenter[1]+roadWidth/2]] # New lane lower
 
 
-upperLaneWaypoints = [[roadCenter[0], roadCenter[1]-roadWidth/2], [roadCenter[0]+roadWidth, roadCenter[1]], [width, roadCenter[1]]]
-bottomLaneWaypoints = [[roadCenter[0], roadCenter[1]+roadWidth/2], [roadCenter[0]+roadWidth, roadCenter[1]], [width, roadCenter[1]]]
+upperLaneWaypoints = [[roadCenter[0], roadCenter[1]-roadWidth/2], [roadCenter[0]+roadWidth*2, roadCenter[1]], [width, roadCenter[1]]]
+bottomLaneWaypoints = [[roadCenter[0], roadCenter[1]+roadWidth/2], [roadCenter[0]+roadWidth*2, roadCenter[1]], [width, roadCenter[1]]]
 
 
-c1 = Car(0.1, 25, (0,roadCenter[1]-roadWidth/2), upperLaneWaypoints)
+c1 = Car(0.1, 25, (20,roadCenter[1]-roadWidth/2), upperLaneWaypoints)
+c5 = Car(0.1, 25, (-170,roadCenter[1]-roadWidth/2), upperLaneWaypoints)
 c2 = Car(0.1, 25, (0,roadCenter[1]+roadWidth/2), bottomLaneWaypoints)
-cars = [c1, c2]
+c3 = Car(0.1, 25, (-150,roadCenter[1]+roadWidth/2), bottomLaneWaypoints)
+c4 = Car(0.1, 25, (-250,roadCenter[1]+roadWidth/2), bottomLaneWaypoints)
+cars = [c1, c2, c3, c4, c5]
 
 
 def drawRoad(screen):
@@ -50,7 +53,7 @@ def update(dt):
   and this will scale your velocity based on time. Extend as necessary."""
 
   for car in cars:
-    car.update(dt)
+    car.update(dt, cars)
 
   
   # Go through events that are passed to the script by the window.

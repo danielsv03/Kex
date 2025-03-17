@@ -9,6 +9,7 @@ class Car:
     position: np.ndarray
     waypoints: list
     current_waypoint = 0
+    rotated_corners: list
 
 
     def __init__(self, speed=0, size=25, position=(0,0), waypoints=[[0,0]]):
@@ -17,6 +18,7 @@ class Car:
         self.position = np.array(position, dtype=float)
         self.waypoints = waypoints
         self.direction = self._normalize(waypoints[self.current_waypoint]-self.position)
+        self.rotated_corners = []
 
     def _normalize (self, vector: tuple) -> np.ndarray:
         vector = np.array(vector, dtype=float)
@@ -34,6 +36,29 @@ class Car:
             if (len(self.waypoints) > self.current_waypoint+1):
                 self.current_waypoint += 1
                 self.change_direction(self.waypoints[self.current_waypoint] - self.position)
+
+
+    def prevent_collision(self, dt: float, carList: list["Car"]) -> None:
+        safety_distance = self.size * 2  # Safe distance threshold (adjustable)
+
+        for car in carList:
+            if car is self:  # Don't check collision with itself
+                continue
+
+            # Predict future positions after 1 second
+            future_position_self = self.position + self.direction * self.speed * 300
+            future_position_other = car.position #+ car.direction * car.speed * 100
+
+            # Compute the distance between future positions
+            distance = np.linalg.norm(future_position_self - future_position_other)
+
+            # If too close, stop the car
+            if distance < safety_distance:
+                self.speed = 0  # Stop the car
+                break  # No need to check further if a collision is detected
+            else:
+                self.speed = 0.1
+            
 
     def change_direction(self, new_direction: tuple) -> None:
         self.direction = self._normalize(new_direction)
@@ -58,9 +83,10 @@ class Car:
         # Translate back
         return np.array([x_new, y_new]) + center
     
-    def update(self, dt):
+    def update(self, dt, carList: list["Car"]):
         self._follow_waypoints()
         self._move(dt)
+        self.prevent_collision(dt, carList)
 
     def draw(self, screen: pygame.Surface):
         """Draws the car as a rotated rectangle using pygame.draw.polygon."""
@@ -81,10 +107,10 @@ class Car:
 
         # Rotate each corner around the center
         angle = self.get_rotation_angle()
-        rotated_corners = np.array([self.rotate_point(p, angle, self.position) for p in corners])
+        self.rotated_corners = np.array([self.rotate_point(p, angle, self.position) for p in corners])
 
         # Convert to integer tuples for Pygame
-        polygon_points = [tuple(p) for p in rotated_corners]
+        polygon_points = [tuple(p) for p in self.rotated_corners]
 
         # Draw the rotated rectangle (car)
         pygame.draw.polygon(screen, (255, 0, 0), polygon_points)  # Red car
