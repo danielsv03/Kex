@@ -4,14 +4,19 @@ import sys
 # Import non-standard modules.
 import pygame
 from pygame.locals import *
+import random
 
 from Car import Car
 
 width, height = 1500, 1000
-carSize = 30;
-
+carSize = 20;
 roadCenter = [width/1.5, height/2]; # The center point of the road
 roadWidth = 50; # The width of the road
+traffic_light_status = 1;
+traffic_light_speed = 10;
+traffic_light_acc = 0.0;
+
+merging_start_point = roadCenter[0]/2
 
 roadBoundaries = [[roadCenter[0], roadCenter[1]-roadWidth, 0, roadCenter[1]-roadWidth], # Upper lane boundarie
                   [roadCenter[0], roadCenter[1], 0, roadCenter[1]],                     # Midle lane boundarie
@@ -22,16 +27,80 @@ roadBoundaries = [[roadCenter[0], roadCenter[1]-roadWidth, 0, roadCenter[1]-road
                   [roadCenter[0]+roadWidth*2, roadCenter[1]+roadWidth/2, width, roadCenter[1]+roadWidth/2]] # New lane lower
 
 
-upperLaneWaypoints = [[roadCenter[0], roadCenter[1]-roadWidth/2], [roadCenter[0]+roadWidth*2, roadCenter[1]], [width, roadCenter[1]]]
-bottomLaneWaypoints = [[roadCenter[0], roadCenter[1]+roadWidth/2], [roadCenter[0]+roadWidth*2, roadCenter[1]], [width, roadCenter[1]]]
+upperLaneWaypoints = [[roadCenter[0]/2, roadCenter[1]-roadWidth/2], [roadCenter[0], roadCenter[1]-roadWidth/2], [roadCenter[0]+roadWidth*2, roadCenter[1]], [width, roadCenter[1]]]
+bottomLaneWaypoints = [[roadCenter[0]/2, roadCenter[1]+roadWidth/2], [roadCenter[0], roadCenter[1]+roadWidth/2], [roadCenter[0]+roadWidth*2, roadCenter[1]], [width, roadCenter[1]]]
 
+cars: list[Car]
+cars = []
 
-c1 = Car(0.1, 25, (20,roadCenter[1]-roadWidth/2), upperLaneWaypoints)
-c5 = Car(0.1, 25, (-170,roadCenter[1]-roadWidth/2), upperLaneWaypoints)
-c2 = Car(0.1, 25, (0,roadCenter[1]+roadWidth/2), bottomLaneWaypoints)
-c3 = Car(0.1, 25, (-150,roadCenter[1]+roadWidth/2), bottomLaneWaypoints)
-c4 = Car(0.1, 25, (-250,roadCenter[1]+roadWidth/2), bottomLaneWaypoints)
-cars = [c1, c2, c3, c4, c5]
+def is_clear(spawn_pos, lane: int):
+        """Returns True if the spawn position is clear of other cars."""
+        for car in cars:
+            if car.lane != lane:
+               continue
+            if abs(car.position[0] - spawn_pos[0]) < carSize:  # Check if too close
+                return False
+        return True
+
+def spawnCars(rate: float):
+    """Spawns cars at the beginning of each lane based on rate with randomness."""
+    
+    # Random chance to spawn a new car (controlled by rate)
+    if random.random() > rate:
+        return
+    
+    # Define spawn positions for each lane
+    upper_lane_spawn = (0, roadCenter[1] - roadWidth / 2)
+    bottom_lane_spawn = (0, roadCenter[1] + roadWidth / 2)
+
+    # Check if there is space in each lane before spawning a car
+
+    # Randomize speed for new cars
+    speed = 0.1
+    #speed = random.uniform(0.05, 0.2)
+
+    start = random.randint(0, round(roadCenter[0]))
+
+    if (random.randint(1,2) == 1):
+       if is_clear(bottom_lane_spawn, 1):
+          cars.append(Car(speed, carSize, bottom_lane_spawn, bottomLaneWaypoints, 1, start))
+    else:
+        if is_clear(upper_lane_spawn, 2):
+          cars.append(Car(speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start))
+   
+
+def traffic_light_priority():
+   global traffic_light_status
+   up_count = 0
+   down_count = 0
+   for car in cars:
+      if (car.position[0] < car.merging_start_point):
+         continue
+      if (car.lane == 1):
+         up_count += 1
+      elif (car.lane ==2):
+         down_count += 1
+      else:
+         continue
+   if (up_count > down_count):
+      traffic_light_status = 1
+   else:
+      traffic_light_status = 2
+
+      
+
+def traffic_light(dt):
+   global traffic_light_acc, traffic_light_speed, traffic_light_status
+   traffic_light_acc = traffic_light_acc + dt
+   if (traffic_light_acc > traffic_light_speed*1000):
+      traffic_light_acc = 0
+      
+      if traffic_light_status == 1:
+         traffic_light_status = 2
+         print("2")
+      else:
+         print("1")
+         traffic_light_status = 1
 
 
 def drawRoad(screen):
@@ -52,8 +121,16 @@ def update(dt):
   
   and this will scale your velocity based on time. Extend as necessary."""
 
+  spawnCars(0.02)
+  #traffic_light(dt)
+  traffic_light_priority()
+
   for car in cars:
-    car.update(dt, cars)
+    car.update(dt, cars, traffic_light_status)
+    if (car.position[0] > width):
+       cars.remove(car)
+    
+  #print(len(cars))
 
   
   # Go through events that are passed to the script by the window.
