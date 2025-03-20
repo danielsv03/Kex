@@ -3,6 +3,7 @@ import pygame
 from pygame.locals import *
 
 class Car:
+    car_id: int
     speed: int
     initial_speed: int
     direction: np.ndarray
@@ -13,10 +14,14 @@ class Car:
     rotated_corners: list
     lane: int
     merging_start_point: float
+    car_color: tuple
+    allowed_to_go: bool
+    
 
 
-    def __init__(self, speed=0, size=25, position=(0,0), waypoints=[[0,0]], lane=1, merging_start_point=0.0):
+    def __init__(self, car_id: int,speed=0, size=25, position=(0,0), waypoints=[[0,0]], lane=1, merging_start_point=0.0):
         self.speed = speed
+        self.car_id = car_id
         self.size = size
         self.position = np.array(position, dtype=float)
         self.waypoints = waypoints
@@ -25,11 +30,16 @@ class Car:
         self.lane=lane
         self.initial_speed = speed
         self.merging_start_point = merging_start_point
+        self.car_color = (255, 0, 0)
+        self.allowed_to_go = True
 
     def _normalize (self, vector: tuple) -> np.ndarray:
         vector = np.array(vector, dtype=float)
         norm = np.linalg.norm(vector)
         return vector/norm if norm != 0 else np.array([1, 0])
+    
+    def bid(self) -> int:
+        return np.random.lognormal(1.7, 0.5)
 
     def _move(self, dt) -> None:
         displacement = self.direction * self.speed * dt
@@ -54,6 +64,19 @@ class Car:
             self.speed = self.initial_speed
             self.prevent_collision_simple(dt, carList)
 
+    def bidding_system(self, dt: float, carList: list["Car"]) -> None:
+        distance_to_merge = np.linalg.norm(self.position - self.waypoints[1])
+
+        if (distance_to_merge < 20):
+            if (self.allowed_to_go):
+                self.speed = self.initial_speed
+                self.prevent_collision_simple(dt, carList)
+                return
+            self.speed = 0
+        else:
+            self.speed = self.initial_speed
+            self.prevent_collision_simple(dt, carList)
+
 
     def prevent_collision_simple(self, dt: float, carList: list["Car"]) -> None:
         safety_distance = self.size * 2  # Safe distance threshold (adjustable)
@@ -73,9 +96,41 @@ class Car:
             # If too close, stop the car
             if distance < safety_distance:
                 self.speed = 0  # Stop the car
+                #self.car_color = (0, 0, 255)
                 break  # No need to check further if a collision is detected
             else:
                 self.speed = 0.1
+                #self.car_color = (255, 0, 0)
+    
+    def detect_future_collision(self, dt: float, carList: list["Car"]) -> bool:
+        # --- Tunable parameters ---
+        safety_distance = self.size * 2    # Distance threshold to begin slowing down
+        max_speed       = self.initial_speed            # Desired maximum speed when unimpeded
+        acceleration    = 0.001             # How quickly the car accelerates/decelerates
+        stop_threshold  = 0.005            # If computed safe speed is < this, we treat it as 0
+        
+        # We'll figure out the desired speed based on the nearest car conflict.
+        # Start by assuming we can go max speed, then reduce if needed.
+        desired_speed = max_speed
+        
+        for car in carList:
+            if car is self:
+                continue
+            
+            # Predict future positions. If different lane, only track x-axis.
+            if car.lane != self.lane:
+                future_position_self  = np.array([self.position[0], 0.0], dtype=float) \
+                                    + (self.direction * self.speed * 300)
+                future_position_other = np.array([car.position[0], 0], dtype=float)
+            else:
+                continue
+            
+            distance = np.linalg.norm(future_position_self - future_position_other)
+            
+            if distance < safety_distance:
+                return True
+            else:
+                return False
             
 
     def zipper_merge_simple(self, dt: float, carList: list["Car"]) -> None:
@@ -88,7 +143,7 @@ class Car:
         
         # --- Tunable parameters ---
         safety_distance = self.size * 2    # Distance threshold to begin slowing down
-        max_speed       = 0.1             # Desired maximum speed when unimpeded
+        max_speed       = self.initial_speed            # Desired maximum speed when unimpeded
         acceleration    = 0.001             # How quickly the car accelerates/decelerates
         stop_threshold  = 0.005            # If computed safe speed is < this, we treat it as 0
         
@@ -164,8 +219,10 @@ class Car:
         self._follow_waypoints()
         self._move(dt)
         if (self.position[0] > self.merging_start_point):
+            #self.prevent_collision_simple(dt, carList)
             #self.traffic_light_simple(dt, carList, light_status)
-            self.zipper_merge_simple(dt, carList)
+            #self.zipper_merge_simple(dt, carList)
+            self.bidding_system(dt, carList)
         else:
             self.prevent_collision_simple(dt, carList)
         #self.prevent_collision(dt, carList)
@@ -197,7 +254,7 @@ class Car:
         polygon_points = [tuple(p) for p in self.rotated_corners]
 
         # Draw the rotated rectangle (car)
-        pygame.draw.polygon(screen, (255, 0, 0), polygon_points)  # Red car
+        pygame.draw.polygon(screen, self.car_color, polygon_points)  # Red car
         
 
     

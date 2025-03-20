@@ -8,6 +8,7 @@ import random
 
 from Car import Car
 
+highest_id = 0
 width, height = 1500, 1000
 carSize = 20;
 roadCenter = [width/1.5, height/2]; # The center point of the road
@@ -33,6 +34,9 @@ bottomLaneWaypoints = [[roadCenter[0]/2, roadCenter[1]+roadWidth/2], [roadCenter
 cars: list[Car]
 cars = []
 
+allowed_cars: list[Car]
+allowed_cars = []
+
 def is_clear(spawn_pos, lane: int):
         """Returns True if the spawn position is clear of other cars."""
         for car in cars:
@@ -44,6 +48,7 @@ def is_clear(spawn_pos, lane: int):
 
 def spawnCars(rate: float):
     """Spawns cars at the beginning of each lane based on rate with randomness."""
+    global highest_id
     
     # Random chance to spawn a new car (controlled by rate)
     if random.random() > rate:
@@ -59,15 +64,60 @@ def spawnCars(rate: float):
     speed = 0.1
     #speed = random.uniform(0.05, 0.2)
 
-    start = random.randint(0, round(roadCenter[0]))
+    #start = random.randint(0, round(roadCenter[0]))
+    start = roadCenter[0]/2
 
     if (random.randint(1,2) == 1):
+       highest_id += 1
        if is_clear(bottom_lane_spawn, 1):
-          cars.append(Car(speed, carSize, bottom_lane_spawn, bottomLaneWaypoints, 1, start))
+          cars.append(Car(highest_id,speed, carSize, bottom_lane_spawn, bottomLaneWaypoints, 1, start))
     else:
         if is_clear(upper_lane_spawn, 2):
-          cars.append(Car(speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start))
+          highest_id += 1
+          cars.append(Car(highest_id ,speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start))
    
+
+def find_first_colliding_car(carList: list[Car]) -> int:
+   max_x = 0
+   #current_car: int = None
+   for car in carList:
+      if (car.detect_future_collision and car.position[0] > max_x):
+         max_x = car.position[0]
+   return max_x
+
+
+def bidding_algorithm(carList: list[Car]) -> None:
+   global traffic_light_status, allowed_cars
+   if (len(allowed_cars) != 0):
+      for car in allowed_cars:
+         if (car.position[0] > roadCenter[0] + roadWidth*2):
+            allowed_cars.remove(car)
+      return
+   for car in carList:
+      car.allowed_to_go = True
+   max_x = find_first_colliding_car(carList)
+   if (max_x != None):
+      biddingUpper = 0
+      biddingBottom = 0
+      for car in carList:
+         if (car.position[0] < max_x and car.position[0] > car.merging_start_point):
+            if (car.lane == 1):
+               biddingUpper += car.bid()
+            else:
+               biddingBottom += car.bid()
+      allowed_lane = 0
+      if (biddingUpper > biddingBottom):
+         allowed_lane = 1
+      else:
+         allowed_lane = 2
+      
+      for car in carList:
+         if (car.position[0] < max_x and car.position[0] > car.merging_start_point):
+            if (car.lane != allowed_lane):
+               car.allowed_to_go = False
+            else:
+               car.car_color = (0, 255, 0)
+               allowed_cars.append(car)
 
 def traffic_light_priority():
    global traffic_light_status
@@ -86,6 +136,7 @@ def traffic_light_priority():
       traffic_light_status = 1
    else:
       traffic_light_status = 2
+
 
       
 
@@ -111,6 +162,7 @@ def drawRoad(screen):
   #  pygame.draw.line(screen, (255,0,0), (stopLine[0], stopLine[1]), (stopLine[2], stopLine[3]), 2)
 
 def update(dt):
+  global cars
   """
   Update game. Called once per frame.
   dt is the amount of time passed since last frame.
@@ -123,7 +175,8 @@ def update(dt):
 
   spawnCars(0.02)
   #traffic_light(dt)
-  traffic_light_priority()
+  #traffic_light_priority()
+  bidding_algorithm(cars)
 
   for car in cars:
     car.update(dt, cars, traffic_light_status)
