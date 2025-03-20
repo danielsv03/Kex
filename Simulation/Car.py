@@ -164,8 +164,8 @@ class Car:
         self._follow_waypoints()
         self._move(dt)
         if (self.position[0] > self.merging_start_point):
-            #self.traffic_light_simple(dt, carList, light_status)
-            self.zipper_merge_simple(dt, carList)
+            self.traffic_light_simple(dt, carList, light_status)
+            # self.zipper_merge_simple(dt, carList)
         else:
             self.prevent_collision_simple(dt, carList)
         #self.prevent_collision(dt, carList)
