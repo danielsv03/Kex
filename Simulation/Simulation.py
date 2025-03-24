@@ -88,8 +88,8 @@ def update_metrics():
       Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
 
    # Stability
-   _, deviation = calculate_speed_metrics(Car_speeds)
-   Stability.append(round(deviation * 100, 3))
+   #_, deviation = calculate_speed_metrics(Car_speeds)
+   #Stability.append(round(deviation * 100, 3))
 
 def JainsFariness(val1, val2):
    return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
@@ -271,7 +271,7 @@ def update(dt):
    
    and this will scale your velocity based on time. Extend as necessary."""
 
-   spawnCars(0.02)
+   spawnCars(0.15)
    #traffic_light(dt)
    #traffic_light_priority()
    bidding_algorithm(dt, cars)
