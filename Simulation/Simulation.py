@@ -6,8 +6,8 @@ import pygame
 from pygame.locals import *
 import random
 import time
-import matplotlib.pyplot as plt
 import csv
+import statistics
 
 from Car import Car
 
@@ -20,16 +20,25 @@ traffic_light_speed = 10
 traffic_light_acc = 0.0
 
 # Evaluation metrics
-Throughput = [0]
-Avg_waitingtime = [0]
-Avg_stoptime = [0]
-Fairness = [0]
-Stability = [0]
-Collision_count = [0]
+Throughput_tot = []
+Avg_waitingtime = []
+Avg_stoptime = []
+Stop_count = []
+Fairness = []
+Stability = []
 
 # Helping metrics
-Passed_cars = 0
-Last_time = time.time()
+Passed_cars_l1 = 0
+Passed_cars_l2 = 0
+Throughput_l1 = 0
+Throughput_l2 = 0
+Passing_durations_sum = 0
+Passing_durations_count = 0
+Stop_times_sum = 0
+Stop_times_count = 0
+Stops = 0
+Car_speeds = []
+Start_time = time.time()
 
 merging_start_point = roadCenter[0]/2
 
@@ -49,13 +58,51 @@ cars: list[Car]
 cars = []
 
 def update_metrics():
-   global Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count, Last_time, Passed_cars
+   global Throughput_l1, Throughput_l2
 
-   # Throughput
-   delta = time.time() - Last_time
-   Throughput.append(round(Passed_cars / delta, 2))
+   # Throughputs
+   delta = time.time() - Start_time
+   passed_cars_tot = Passed_cars_l1 + Passed_cars_l2
+   Throughput_tot.append(round(passed_cars_tot / delta, 2))
+   Throughput_l1 = round(Passed_cars_l1 / delta, 2)
+   Throughput_l2 = round(Passed_cars_l2 / delta, 2)
 
-def save_metrics_to_csv(filename="Datasets/TimeBased.csv"):
+   # Avg waiting time
+   if (Passing_durations_count != 0):
+      Avg_waitingtime.append(round(Passing_durations_sum / Passing_durations_count, 2))
+
+   # Avg stop time
+   if (Stop_times_count != 0):
+      Avg_stoptime.append(round(Stop_times_sum / Stop_times_count, 2))
+
+   # Stop count
+   Stop_count.append(Stops)
+
+   # Fairness
+   if (Throughput_l1 != 0 and Throughput_l2 != 0):
+      Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
+
+   # Stability
+   _, deviation = calculate_speed_metrics(Car_speeds)
+   Stability.append(round(deviation * 100, 3))
+
+def JainsFariness(val1, val2):
+   return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
+
+def calculate_speed_metrics(speeds: list[float]):
+   """
+   Returns the average and standard deviation of a list of speeds.
+   If the list is empty, returns (0.0, 0.0).
+   """
+   if not speeds:
+      return 0.0, 0.0
+
+   avg_speed = sum(speeds) / len(speeds)
+   std_deviation = statistics.stdev(speeds) if len(speeds) > 1 else 0.0
+
+   return avg_speed, std_deviation
+
+def save_metrics_to_csv(filename="Datasets/Zipper.csv"):
    """Saves all evaluation metrics to a CSV file."""
    
    global Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count
@@ -65,11 +112,11 @@ def save_metrics_to_csv(filename="Datasets/TimeBased.csv"):
       writer = csv.writer(file)
 
       # Write header row
-      writer.writerow(["Throughput", "Avg Waiting Time", "Avg Stop Time", "Fairness", "Stability", "Collision Count"])
+      writer.writerow(["Time Step", "Throughput", "Avg Waiting Time", "Avg Stop Time", "Stop Count", "Fairness", "Stability (Speed deviation)"])
 
       # Write data (Each row contains values from the same time step)
-      for i, (t, wait, stop, fair, stab, coll) in enumerate(zip(Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count)):
-         writer.writerow([i, t, wait, stop, fair, stab, coll])
+      for i, (t, wait, stoptm, stop, fair, stab) in enumerate(zip(Throughput_tot, Avg_waitingtime, Avg_stoptime, Stop_count, Fairness, Stability)):
+         writer.writerow([i, t, wait, stoptm, stop, fair, stab])
 
    print(f"Metrics saved to {filename}")
 
@@ -157,7 +204,7 @@ def update(dt):
    
    and this will scale your velocity based on time. Extend as necessary."""
 
-   global Passed_cars
+   global Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum
 
    spawnCars(0.02)
    traffic_light(dt)
@@ -165,10 +212,30 @@ def update(dt):
 
    for car in cars:
       car.update(dt, cars, traffic_light_status)
+
+      # Save speed for all cars
+      Car_speeds.append(car.speed)
+
+      # Save stop durations of cars and increment total stop count
+      if (car.last_stop_duration > 0):
+         Stop_times_sum += car.last_stop_duration
+         Stop_times_count += 1
+         Stops += 1
+
       if (car.position[0] > width):
+         # Increase passed-cars-count
+         if (car.origin_lane == 1):
+            Passed_cars_l1 += 1
+         else:
+            Passed_cars_l2 += 1
+
+         # Calculate duration for the car to pass
+         Passing_durations_sum += time.time() - car.spawn_time
+         Passing_durations_count += 1
+
          cars.remove(car)
-         Passed_cars = Passed_cars + 1
-         update_metrics()
+      
+      update_metrics()
   
    # Go through events that are passed to the script by the window.
    for event in pygame.event.get():
@@ -202,12 +269,13 @@ def draw(screen):
       car.draw(screen)
 
    # Display variable values in the top-left corner
-   draw_text(screen, f"Throughput: {Throughput[len(Throughput) - 1]}", (10, 10))
-   draw_text(screen, f"Average Waiting Time: {Avg_waitingtime[len(Avg_waitingtime) - 1]}", (10, 40))
-   draw_text(screen, f"Average Stop Time: {Avg_stoptime[len(Avg_stoptime) - 1]}", (10, 70))
-   draw_text(screen, f"Fairness: {Fairness[len(Fairness) - 1]}", (10, 100))
-   draw_text(screen, f"Traffic Stability: {Stability[len(Stability) - 1]}", (10, 130))
-   draw_text(screen, f"Collision Count: {Collision_count[len(Collision_count) - 1]}", (10, 160))
+   if (len(Throughput_tot) * len(Avg_waitingtime) * len(Avg_stoptime) * len(Stop_count) * len(Fairness) * len(Stability) > 0):
+      draw_text(screen, f"Throughput: {Throughput_tot[-1]} vehicles/sec", (10, 10))
+      draw_text(screen, f"Average Waiting Time: {Avg_waitingtime[-1]} sec/vehicle", (10, 40))
+      draw_text(screen, f"Average Stop Time: {Avg_stoptime[-1]} sec/vehicle", (10, 70))
+      draw_text(screen, f"Stop Count: {Stop_count[-1]} stops", (10, 100))
+      draw_text(screen, f"Fairness: {Fairness[-1]} (Lane 1: {Throughput_l1}, Lane 2: {Throughput_l2})", (10, 130))
+      draw_text(screen, f"Traffic Stability: {Stability[-1]}", (10, 160))
    
    # Flip the display so that the things we drew actually show up.
    pygame.display.flip()

@@ -1,5 +1,6 @@
 import numpy as np
 import pygame
+import time
 from pygame.locals import *
 
 class Car:
@@ -11,8 +12,12 @@ class Car:
     waypoints: list
     current_waypoint = 0
     rotated_corners: list
+    origin_lane: int
     lane: int
     merging_start_point: float
+    spawn_time: int
+    stopped_timestamp: int
+    last_stop_duration: int
 
 
     def __init__(self, speed=0, size=25, position=(0,0), waypoints=[[0,0]], lane=1, merging_start_point=0.0):
@@ -22,9 +27,13 @@ class Car:
         self.waypoints = waypoints
         self.direction = self._normalize(waypoints[self.current_waypoint]-self.position)
         self.rotated_corners = []
-        self.lane=lane
+        self.lane = lane
+        self.origin_lane = lane
         self.initial_speed = speed
         self.merging_start_point = merging_start_point
+        self.spawn_time = time.time()
+        self.stopped_timestamp = 0
+        self.last_stop_duration = 0
 
     def _normalize (self, vector: tuple) -> np.ndarray:
         vector = np.array(vector, dtype=float)
@@ -170,6 +179,17 @@ class Car:
             self.prevent_collision_simple(dt, carList)
         #self.prevent_collision(dt, carList)
         #self.zipper_merge_simple(dt, carList)
+    
+        if (self.last_stop_duration > 0):
+            self.last_stop_duration = 0     # Reset last stop time after 1 tick
+
+        if (self.speed == 0 and self.stopped_timestamp == 0):   # Car was stopped
+            self.stopped_timestamp = time.time()    # Save time when vehicle was stopped
+        
+        if (self.speed > 0 and self.stopped_timestamp > 0):   # Vehicle is moving and was previously stopped
+            self.last_stop_duration = time.time() - self.stopped_timestamp  # Calculate the duration of the stop
+            self.stopped_timestamp = 0
+        
 
 
     def draw(self, screen: pygame.Surface):
