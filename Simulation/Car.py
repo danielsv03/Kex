@@ -58,7 +58,7 @@ class Car:
     def traffic_light_simple(self, dt: float, carList: list["Car"], light_status: int) -> None:
         distance_to_light = np.linalg.norm(self.position - self.waypoints[1])
 
-        if (distance_to_light < 20 and light_status != self.lane):
+        if (distance_to_light < 40 and light_status != self.lane):
             self.speed = 0
         else:
             self.speed = self.initial_speed
@@ -128,9 +128,11 @@ class Car:
             distance = np.linalg.norm(future_position_self - future_position_other)
             
             if distance < safety_distance:
+                self.allowed_to_go = False
+                #car.allowed_to_go = False
                 return True
-            else:
-                return False
+            
+        return False
             
 
     def zipper_merge_simple(self, dt: float, carList: list["Car"]) -> None:
@@ -218,6 +220,7 @@ class Car:
     def update(self, dt, carList: list["Car"], light_status: int):
         self._follow_waypoints()
         self._move(dt)
+        
         if (self.position[0] > self.merging_start_point):
             #self.prevent_collision_simple(dt, carList)
             #self.traffic_light_simple(dt, carList, light_status)

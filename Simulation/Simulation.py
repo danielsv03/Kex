@@ -2,6 +2,7 @@
 import sys
  
 # Import non-standard modules.
+import numpy as np
 import pygame
 from pygame.locals import *
 import random
@@ -77,47 +78,61 @@ def spawnCars(rate: float):
           cars.append(Car(highest_id ,speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start))
    
 
-def find_first_colliding_car(carList: list[Car]) -> int:
+def find_first_colliding_car(dt, carList: list[Car]) -> int:
    max_x = 0
    #current_car: int = None
    for car in carList:
-      if (car.detect_future_collision and car.position[0] > max_x):
+      if (car.detect_future_collision(dt, carList) and car.position[0] > max_x):
          max_x = car.position[0]
    return max_x
 
 
-def bidding_algorithm(carList: list[Car]) -> None:
-   global traffic_light_status, allowed_cars
+def bidding_algorithm(dt, carList: list[Car]) -> None:
+   global allowed_cars
    if (len(allowed_cars) != 0):
       for car in allowed_cars:
          if (car.position[0] > roadCenter[0] + roadWidth*2):
             allowed_cars.remove(car)
       return
+   else:
+      for car in carList:
+         car.allowed_to_go = True
+   collision_detected = False
    for car in carList:
-      car.allowed_to_go = True
-   max_x = find_first_colliding_car(carList)
-   if (max_x != None):
+      distance_to_merge = np.linalg.norm(car.position - car.waypoints[1])
+      if (distance_to_merge < 30):
+         if (car.detect_future_collision(dt, carList)):
+            #print("GUUH")
+            collision_detected = True
+         else:
+            collision_detected = False
+   
+   if (collision_detected):
       biddingUpper = 0
       biddingBottom = 0
       for car in carList:
-         if (car.position[0] < max_x and car.position[0] > car.merging_start_point):
+         if (car.position[0] > car.merging_start_point and car.position[0] < car.waypoints[1][0]):
             if (car.lane == 1):
                biddingUpper += car.bid()
             else:
                biddingBottom += car.bid()
-      allowed_lane = 0
+      allowed_lane = 1
       if (biddingUpper > biddingBottom):
          allowed_lane = 1
       else:
          allowed_lane = 2
       
       for car in carList:
-         if (car.position[0] < max_x and car.position[0] > car.merging_start_point):
-            if (car.lane != allowed_lane):
-               car.allowed_to_go = False
-            else:
+         if (car.position[0] > car.merging_start_point and car.position[0] < car.waypoints[1][0]):
+            if (car.lane == allowed_lane):
+               car.allowed_to_go = True
                car.car_color = (0, 255, 0)
                allowed_cars.append(car)
+            else:
+               car.car_color = (0, 0, 255)
+               car.allowed_to_go = False
+
+
 
 def traffic_light_priority():
    global traffic_light_status
@@ -176,7 +191,7 @@ def update(dt):
   spawnCars(0.02)
   #traffic_light(dt)
   #traffic_light_priority()
-  bidding_algorithm(cars)
+  bidding_algorithm(dt, cars)
 
   for car in cars:
     car.update(dt, cars, traffic_light_status)
