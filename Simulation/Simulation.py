@@ -6,17 +6,41 @@ import numpy as np
 import pygame
 from pygame.locals import *
 import random
+import time
+import csv
+import statistics
 
 from Car import Car
 
 highest_id = 0
 width, height = 1500, 1000
-carSize = 20;
-roadCenter = [width/1.5, height/2]; # The center point of the road
-roadWidth = 50; # The width of the road
-traffic_light_status = 1;
-traffic_light_speed = 10;
-traffic_light_acc = 0.0;
+carSize = 20
+roadCenter = [width/1.5, height/2] # The center point of the road
+roadWidth = 50 # The width of the road
+traffic_light_status = 1
+traffic_light_speed = 10
+traffic_light_acc = 0.0
+
+# Evaluation metrics
+Throughput_tot = []
+Avg_waitingtime = []
+Avg_stoptime = []
+Stop_count = []
+Fairness = []
+Stability = []
+
+# Helping metrics
+Passed_cars_l1 = 0
+Passed_cars_l2 = 0
+Throughput_l1 = 0
+Throughput_l2 = 0
+Passing_durations_sum = 0
+Passing_durations_count = 0
+Stop_times_sum = 0
+Stop_times_count = 0
+Stops = 0
+Car_speeds = []
+Start_time = time.time()
 
 merging_start_point = roadCenter[0]/2
 
@@ -37,6 +61,69 @@ cars = []
 
 allowed_cars: list[Car]
 allowed_cars = []
+
+def update_metrics():
+   global Throughput_l1, Throughput_l2
+
+   # Throughputs
+   delta = time.time() - Start_time
+   passed_cars_tot = Passed_cars_l1 + Passed_cars_l2
+   Throughput_tot.append(round(passed_cars_tot / delta, 2))
+   Throughput_l1 = round(Passed_cars_l1 / delta, 2)
+   Throughput_l2 = round(Passed_cars_l2 / delta, 2)
+
+   # Avg waiting time
+   if (Passing_durations_count != 0):
+      Avg_waitingtime.append(round(Passing_durations_sum / Passing_durations_count, 2))
+
+   # Avg stop time
+   if (Stop_times_count != 0):
+      Avg_stoptime.append(round(Stop_times_sum / Stop_times_count, 2))
+
+   # Stop count
+   Stop_count.append(Stops)
+
+   # Fairness
+   if (Throughput_l1 != 0 and Throughput_l2 != 0):
+      Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
+
+   # Stability
+   _, deviation = calculate_speed_metrics(Car_speeds)
+   Stability.append(round(deviation * 100, 3))
+
+def JainsFariness(val1, val2):
+   return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
+
+def calculate_speed_metrics(speeds: list[float]):
+   """
+   Returns the average and standard deviation of a list of speeds.
+   If the list is empty, returns (0.0, 0.0).
+   """
+   if not speeds:
+      return 0.0, 0.0
+
+   avg_speed = sum(speeds) / len(speeds)
+   std_deviation = statistics.stdev(speeds) if len(speeds) > 1 else 0.0
+
+   return avg_speed, std_deviation
+
+def save_metrics_to_csv(filename="Datasets/Zipper.csv"):
+   """Saves all evaluation metrics to a CSV file."""
+   
+   global Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count
+
+   # Open file in write mode (overwrite if exists)
+   with open(filename, "w", newline="") as file:
+      writer = csv.writer(file)
+
+      # Write header row
+      writer.writerow(["Time Step", "Throughput", "Avg Waiting Time", "Avg Stop Time", "Stop Count", "Fairness", "Stability (Speed deviation)"])
+
+      # Write data (Each row contains values from the same time step)
+      for i, (t, wait, stoptm, stop, fair, stab) in enumerate(zip(Throughput_tot, Avg_waitingtime, Avg_stoptime, Stop_count, Fairness, Stability)):
+         writer.writerow([i, t, wait, stoptm, stop, fair, stab])
+
+   print(f"Metrics saved to {filename}")
 
 def is_clear(spawn_pos, lane: int):
         """Returns True if the spawn position is clear of other cars."""
@@ -152,9 +239,6 @@ def traffic_light_priority():
    else:
       traffic_light_status = 2
 
-
-      
-
 def traffic_light(dt):
    global traffic_light_acc, traffic_light_speed, traffic_light_status
    traffic_light_acc = traffic_light_acc + dt
@@ -168,7 +252,6 @@ def traffic_light(dt):
          print("1")
          traffic_light_status = 1
 
-
 def drawRoad(screen):
   for roadLine in roadBoundaries:
     pygame.draw.line(screen, (0,0,0), (roadLine[0], roadLine[1]), (roadLine[2], roadLine[3]), 2)
@@ -177,58 +260,92 @@ def drawRoad(screen):
   #  pygame.draw.line(screen, (255,0,0), (stopLine[0], stopLine[1]), (stopLine[2], stopLine[3]), 2)
 
 def update(dt):
-  global cars
-  """
-  Update game. Called once per frame.
-  dt is the amount of time passed since last frame.
-  If you want to have constant apparent movement no matter your framerate,
-  what you can do is something like
-  
-  x += v * dt
-  
-  and this will scale your velocity based on time. Extend as necessary."""
+   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum
+   """
+   Update game. Called once per frame.
+   dt is the amount of time passed since last frame.
+   If you want to have constant apparent movement no matter your framerate,
+   what you can do is something like
+   
+   x += v * dt
+   
+   and this will scale your velocity based on time. Extend as necessary."""
 
-  spawnCars(0.02)
-  #traffic_light(dt)
-  #traffic_light_priority()
-  bidding_algorithm(dt, cars)
+   spawnCars(0.02)
+   #traffic_light(dt)
+   #traffic_light_priority()
+   bidding_algorithm(dt, cars)
+      # traffic_light_priority()
 
-  for car in cars:
-    car.update(dt, cars, traffic_light_status)
-    if (car.position[0] > width):
-       cars.remove(car)
-    
-  #print(len(cars))
+   for car in cars:
+      car.update(dt, cars, traffic_light_status)
 
+      # Save speed for all cars
+      Car_speeds.append(car.speed)
+
+      # Save stop durations of cars and increment total stop count
+      if (car.last_stop_duration > 0):
+         Stop_times_sum += car.last_stop_duration
+         Stop_times_count += 1
+         Stops += 1
+
+      if (car.position[0] > width):
+         # Increase passed-cars-count
+         if (car.origin_lane == 1):
+            Passed_cars_l1 += 1
+         else:
+            Passed_cars_l2 += 1
+
+         # Calculate duration for the car to pass
+         Passing_durations_sum += time.time() - car.spawn_time
+         Passing_durations_count += 1
+
+         cars.remove(car)
+      
+      update_metrics()
   
-  # Go through events that are passed to the script by the window.
-  for event in pygame.event.get():
-    # We need to handle these events. Initially the only one you'll want to care
-    # about is the QUIT event, because if you don't handle it, your game will crash
-    # whenever someone tries to exit.
-    if event.type == QUIT:
-      pygame.quit() # Opposite of pygame.init
-      sys.exit() # Not including this line crashes the script on Windows. Possibly
-      # on other operating systems too, but I don't know for sure.
-    # Handle other events as you wish.
- 
+   # Go through events that are passed to the script by the window.
+   for event in pygame.event.get():
+      # We need to handle these events. Initially the only one you'll want to care
+      # about is the QUIT event, because if you don't handle it, your game will crash
+      # whenever someone tries to exit.
+      if event.type == QUIT:
+         save_metrics_to_csv()
+         pygame.quit() # Opposite of pygame.init
+         sys.exit() # Not including this line crashes the script on Windows. Possibly
+         # on other operating systems too, but I don't know for sure.
+         # Handle other events as you wish.
+
+def draw_text(screen, text, position, font_size=24, color=(0, 0, 0)):
+    """Helper function to draw text on the screen."""
+    font = pygame.font.Font(None, font_size)  # Use default font
+    text_surface = font.render(text, True, color)
+    screen.blit(text_surface, position)
+
 def draw(screen):
-  """
-  Draw things to the window. Called once per frame.
-  """
-  screen.fill((255, 255, 255)) # Fill the screen with black.
+   """
+   Draw things to the window. Called once per frame.
+   """
+   screen.fill((255, 255, 255)) # Fill the screen with black.
 
-  rect_color = (255, 0, 0)  # Red
+   rect_color = (255, 0, 0)  # Red
 
-  drawRoad(screen);
+   drawRoad(screen)
 
-  for car in cars:
-    car.draw(screen)
-  
-  # Redraw screen here.
-  
-  # Flip the display so that the things we drew actually show up.
-  pygame.display.flip()
+   for car in cars:
+      car.draw(screen)
+
+   # Display variable values in the top-left corner
+   if (len(Throughput_tot) * len(Avg_waitingtime) * len(Avg_stoptime) * len(Stop_count) * len(Fairness) * len(Stability) > 0):
+      draw_text(screen, f"Throughput: {Throughput_tot[-1]} vehicles/sec", (10, 10))
+      draw_text(screen, f"Average Waiting Time: {Avg_waitingtime[-1]} sec/vehicle", (10, 40))
+      draw_text(screen, f"Average Stop Time: {Avg_stoptime[-1]} sec/vehicle", (10, 70))
+      draw_text(screen, f"Stop Count: {Stop_count[-1]} stops", (10, 100))
+      draw_text(screen, f"Fairness: {Fairness[-1]} (Lane 1: {Throughput_l1}, Lane 2: {Throughput_l2})", (10, 130))
+      draw_text(screen, f"Traffic Stability: {Stability[-1]}", (10, 160))
+   
+   # Flip the display so that the things we drew actually show up.
+   pygame.display.flip()
  
 def runPyGame():
   # Initialise PyGame.
@@ -252,6 +369,6 @@ def runPyGame():
     update(dt) # You can update/draw here, I've just moved the code for neatness.
     draw(screen)
     
-    dt = fpsClock.tick(fps)
+    dt = fpsClock.tick(fps) * 5
 
 runPyGame()
