@@ -231,9 +231,9 @@ class Car:
         
         if (self.position[0] > self.merging_start_point):
             #self.prevent_collision_simple(dt, carList)
-            #self.traffic_light_simple(dt, carList, light_status)
-            #self.zipper_merge_simple(dt, carList)
-            self.bidding_system(dt, carList)
+            # self.traffic_light_simple(dt, carList, light_status)
+            self.zipper_merge_simple(dt, carList)
+            # self.bidding_system(dt, carList)
         else:
             self.prevent_collision_simple(dt, carList)
         #self.prevent_collision(dt, carList)

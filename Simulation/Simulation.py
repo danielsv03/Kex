@@ -1,4 +1,5 @@
 # Import standard modules.
+import math
 import sys
  
 # Import non-standard modules.
@@ -39,7 +40,11 @@ Passing_durations_count = 0
 Stop_times_sum = 0
 Stop_times_count = 0
 Stops = 0
-Car_speeds = []
+Car_speeds_count = 0
+Car_speeds_sum = 0
+Car_speeds_last = 0
+Car_speeds_mean = 0
+Car_speeds_sq = 0
 Start_time = time.time()
 
 merging_start_point = roadCenter[0]/2
@@ -63,7 +68,7 @@ allowed_cars: list[Car]
 allowed_cars = []
 
 def update_metrics():
-   global Throughput_l1, Throughput_l2
+   global Throughput_l1, Throughput_l2, Car_speeds_mean, Car_speeds_sq
 
    # Throughputs
    delta = time.time() - Start_time
@@ -87,25 +92,19 @@ def update_metrics():
    if (Throughput_l1 != 0 and Throughput_l2 != 0):
       Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
 
-   # Stability
-   #_, deviation = calculate_speed_metrics(Car_speeds)
-   #Stability.append(round(deviation * 100, 3))
+   # Stability (Welfords algorithm)
+   Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
+   Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
+   Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
 
 def JainsFariness(val1, val2):
    return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
 
-def calculate_speed_metrics(speeds: list[float]):
-   """
-   Returns the average and standard deviation of a list of speeds.
-   If the list is empty, returns (0.0, 0.0).
-   """
-   if not speeds:
-      return 0.0, 0.0
-
-   avg_speed = sum(speeds) / len(speeds)
-   std_deviation = statistics.stdev(speeds) if len(speeds) > 1 else 0.0
-
-   return avg_speed, std_deviation
+def finalize_stddev(n, M2):
+    if n < 2:
+        return float('nan')  # Not enough data for standard deviation
+    variance = M2 / (n - 1)
+    return math.sqrt(variance)
 
 def save_metrics_to_csv(filename="Datasets/Zipper.csv"):
    """Saves all evaluation metrics to a CSV file."""
@@ -163,7 +162,6 @@ def spawnCars(rate: float):
         if is_clear(upper_lane_spawn, 2):
           highest_id += 1
           cars.append(Car(highest_id ,speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start))
-   
 
 def find_first_colliding_car(dt, carList: list[Car]) -> int:
    max_x = 0
@@ -172,7 +170,6 @@ def find_first_colliding_car(dt, carList: list[Car]) -> int:
       if (car.detect_future_collision(dt, carList) and car.position[0] > max_x):
          max_x = car.position[0]
    return max_x
-
 
 def bidding_algorithm(dt, carList: list[Car]) -> None:
    global allowed_cars
@@ -219,8 +216,6 @@ def bidding_algorithm(dt, carList: list[Car]) -> None:
                car.car_color = (0, 0, 255)
                car.allowed_to_go = False
 
-
-
 def traffic_light_priority():
    global traffic_light_status
    up_count = 0
@@ -260,7 +255,7 @@ def drawRoad(screen):
   #  pygame.draw.line(screen, (255,0,0), (stopLine[0], stopLine[1]), (stopLine[2], stopLine[3]), 2)
 
 def update(dt):
-   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum
+   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last
    """
    Update game. Called once per frame.
    dt is the amount of time passed since last frame.
@@ -271,17 +266,19 @@ def update(dt):
    
    and this will scale your velocity based on time. Extend as necessary."""
 
-   spawnCars(0.15)
-   #traffic_light(dt)
-   #traffic_light_priority()
-   bidding_algorithm(dt, cars)
+   spawnCars(0.1)
+   # traffic_light(dt)
+   traffic_light_priority()
+   # bidding_algorithm(dt, cars)
       # traffic_light_priority()
 
    for car in cars:
       car.update(dt, cars, traffic_light_status)
 
       # Save speed for all cars
-      Car_speeds.append(car.speed)
+      Car_speeds_last = car.speed
+      Car_speeds_sum += car.speed
+      Car_speeds_count += 1
 
       # Save stop durations of cars and increment total stop count
       if (car.last_stop_duration > 0):

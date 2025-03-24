@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 def main():
-    csv_files = ["PriorityBased.csv", "TimeBased.csv", "Zipper.csv"]
+    csv_files = ["AuctionBased.csv", "PriorityBased.csv", "TimeBased.csv", "Zipper.csv"]
     
     # List of metrics that we expect to plot.
     # (If your CSV files include a 'Time Step' column, it will be used for the x-axis.
