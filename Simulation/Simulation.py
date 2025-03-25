@@ -7,9 +7,7 @@ import numpy as np
 import pygame
 from pygame.locals import *
 import random
-import time
 import csv
-import statistics
 
 from Car import Car
 
@@ -45,7 +43,7 @@ Car_speeds_sum = 0
 Car_speeds_last = 0
 Car_speeds_mean = 0
 Car_speeds_sq = 0
-Start_time = time.time()
+Elapsed_time = 0
 
 merging_start_point = roadCenter[0]/2
 
@@ -71,11 +69,10 @@ def update_metrics():
    global Throughput_l1, Throughput_l2, Car_speeds_mean, Car_speeds_sq
 
    # Throughputs
-   delta = time.time() - Start_time
    passed_cars_tot = Passed_cars_l1 + Passed_cars_l2
-   Throughput_tot.append(round(passed_cars_tot / delta, 2))
-   Throughput_l1 = round(Passed_cars_l1 / delta, 2)
-   Throughput_l2 = round(Passed_cars_l2 / delta, 2)
+   Throughput_tot.append(round(passed_cars_tot / Elapsed_time, 2))
+   Throughput_l1 = round(Passed_cars_l1 / Elapsed_time, 2)
+   Throughput_l2 = round(Passed_cars_l2 / Elapsed_time, 2)
 
    # Avg waiting time
    if (Passing_durations_count != 0):
@@ -255,7 +252,7 @@ def drawRoad(screen):
   #  pygame.draw.line(screen, (255,0,0), (stopLine[0], stopLine[1]), (stopLine[2], stopLine[3]), 2)
 
 def update(dt):
-   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last
+   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last, Elapsed_time
    """
    Update game. Called once per frame.
    dt is the amount of time passed since last frame.
@@ -266,11 +263,11 @@ def update(dt):
    
    and this will scale your velocity based on time. Extend as necessary."""
 
+   Elapsed_time += dt / 1000
    spawnCars(0.04)
-   #traffic_light(dt)
-   #traffic_light_priority()
-   bidding_algorithm(dt, cars)
-      # traffic_light_priority()
+   traffic_light(dt)
+   # traffic_light_priority()
+   # bidding_algorithm(dt, cars)
 
    for car in cars:
       car.update(dt, cars, traffic_light_status)
@@ -294,7 +291,7 @@ def update(dt):
             Passed_cars_l2 += 1
 
          # Calculate duration for the car to pass
-         Passing_durations_sum += time.time() - car.spawn_time
+         Passing_durations_sum += car.elapsed_time
          Passing_durations_count += 1
 
          cars.remove(car)
@@ -362,7 +359,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 1
+  SIMULATION_SPEED = 20
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.

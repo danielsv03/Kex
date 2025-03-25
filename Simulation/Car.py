@@ -18,9 +18,9 @@ class Car:
     merging_start_point: float
     car_color: tuple
     allowed_to_go: bool
-    spawn_time: int
     stopped_timestamp: int
     last_stop_duration: int
+    elapsed_time: int
 
 
     def __init__(self, car_id: int,speed=0, size=25, position=(0,0), waypoints=[[0,0]], lane=1, merging_start_point=0.0):
@@ -37,7 +37,7 @@ class Car:
         self.merging_start_point = merging_start_point
         self.car_color = (255, 0, 0)
         self.allowed_to_go = True
-        self.spawn_time = time.time()
+        self.elapsed_time = 0
         self.stopped_timestamp = 0
         self.last_stop_duration = 0
 
@@ -130,12 +130,12 @@ class Car:
 
         if (collision):
             self.speed = max(0.0, self.speed - deceleration*dt)
-            #if self.speed == 0.0:
-            #    self.car_color = (255, 0, 0)
-            #else:
-            #    self.car_color = (0, 0, 255)
+            if self.speed == 0.0:
+               self.car_color = (255, 0, 0)
+            else:
+               self.car_color = (0, 0, 255)
         else:
-            #self.car_color = (0, 255, 0)
+            self.car_color = (0, 255, 0)
             self.speed = min(self.initial_speed, self.speed + acceleration*dt)
     
     def detect_future_collision(self, dt: float, carList: list["Car"]) -> bool:
@@ -315,14 +315,15 @@ class Car:
         return np.array([x_new, y_new]) + center
     
     def update(self, dt, carList: list["Car"], light_status: int):
+        self.elapsed_time += dt / 1000
         self._follow_waypoints()
         self._move(dt)
         
         if (self.position[0] > self.merging_start_point and self.current_waypoint < 2):
             #self.prevent_collision_simple(dt, carList)
-            #self.traffic_light_simple(dt, carList, light_status)
-            #self.zipper_merge_complex(dt, carList)
-            self.bidding_system(dt, carList)
+            # self.traffic_light_simple(dt, carList, light_status)
+            self.zipper_merge_complex(dt, carList)
+            # self.bidding_system(dt, carList)
         else:
             self.prevent_collision_simple(dt, carList)
         #self.prevent_collision(dt, carList)
@@ -332,10 +333,10 @@ class Car:
             self.last_stop_duration = 0     # Reset last stop time after 1 tick
 
         if (self.speed == 0 and self.stopped_timestamp == 0):   # Car was stopped
-            self.stopped_timestamp = time.time()    # Save time when vehicle was stopped
+            self.stopped_timestamp = self.elapsed_time    # Save time when vehicle was stopped
         
         if (self.speed > 0 and self.stopped_timestamp > 0):   # Vehicle is moving and was previously stopped
-            self.last_stop_duration = time.time() - self.stopped_timestamp  # Calculate the duration of the stop
+            self.last_stop_duration = self.elapsed_time - self.stopped_timestamp  # Calculate the duration of the stop
             self.stopped_timestamp = 0
         
 
