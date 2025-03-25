@@ -266,10 +266,10 @@ def update(dt):
    
    and this will scale your velocity based on time. Extend as necessary."""
 
-   spawnCars(0.02)
-   traffic_light(dt)
+   spawnCars(0.04)
+   #traffic_light(dt)
    #traffic_light_priority()
-   #bidding_algorithm(dt, cars)
+   bidding_algorithm(dt, cars)
       # traffic_light_priority()
 
    for car in cars:
