@@ -67,48 +67,76 @@ class Car:
         distance_to_light = np.linalg.norm(self.position - self.waypoints[1])
 
         if (distance_to_light < 40 and light_status != self.lane):
-            self.speed = 0
+            #self.speed = 0
+            self.prevent_collision_simple(dt, carList, [self.waypoints[1]])
         else:
-            self.speed = self.initial_speed
+            #self.speed = self.initial_speed
             self.prevent_collision_simple(dt, carList)
 
     def bidding_system(self, dt: float, carList: list["Car"]) -> None:
         distance_to_merge = np.linalg.norm(self.position - self.waypoints[1])
 
-        if (distance_to_merge < 20):
+        if (distance_to_merge < 40):
             if (self.allowed_to_go):
-                self.speed = self.initial_speed
+                #self.speed = self.initial_speed
                 self.prevent_collision_simple(dt, carList)
                 return
-            self.speed = 0
+            #self.speed = 0
+            self.prevent_collision_simple(dt, carList, [self.waypoints[1]])
         else:
-            self.speed = self.initial_speed
+            #self.speed = self.initial_speed
             self.prevent_collision_simple(dt, carList)
 
 
-    def prevent_collision_simple(self, dt: float, carList: list["Car"]) -> None:
-        safety_distance = self.size * 2  # Safe distance threshold (adjustable)
+    def prevent_collision_simple(self, dt: float, carList: list["Car"], extraStop: list = []) -> None:
+        """
+        A lane-aware, distance-based collision avoidance that smoothly accelerates
+        or decelerates to maintain a safe following distance. Only stops if truly necessary.
+        """
+        # --- Tunable parameters ---
+        safety_distance   = self.size * 2.0   # Minimum gap we want to maintain
+        max_speed         = self.initial_speed
+        acceleration      = 0.0002  # How quickly we speed up (units per dt)
+        deceleration      = 0.0005  # How quickly we slow down (units per dt)
+        stop_threshold    = 0.01   # If safe speed is below this, come to a full stop
+        lateral_threshold = self.size * 1.2  # How wide the lane is considered (adjust as needed)
 
-        for car in carList:
-            if car is self:  # Don't check collision with itself
+        # By default, assume we can go as fast as we like
+        desired_speed = max_speed
+
+        # Vector representing our travel direction
+        dir_self = self.direction  # Already normalized
+
+        future_self = self.position + dir_self * max(30 , self.speed * 500)
+
+        collision = False
+
+        for other in carList:
+            if other is self:
                 continue
             
-            # Predict future positions after 1 second
-            future_position_self = self.position + self.direction * self.speed * 300
-            future_position_other = car.position #+ car.direction * car.speed * 100
+            future_other = other.position + other.direction * other.speed
 
+            distance_prediction = np.linalg.norm(future_self - future_other)
 
-            # Compute the distance between future positions
-            distance = np.linalg.norm(future_position_self - future_position_other)
+            if (distance_prediction < safety_distance):
+                collision = True
 
-            # If too close, stop the car
-            if distance < safety_distance:
-                self.speed = 0  # Stop the car
-                #self.car_color = (0, 0, 255)
-                break  # No need to check further if a collision is detected
+        if (len(extraStop) > 0):
+            for stop in extraStop:
+                distance_prediction = np.linalg.norm(future_self - np.array((stop[0], stop[1]), dtype=float))
+            if (distance_prediction < safety_distance):
+                collision = True
+
+        if (collision):
+            self.speed = max(0.0, self.speed - deceleration*dt)
+            if self.speed == 0.0:
+                self.car_color = (255, 0, 0)
             else:
-                self.speed = 0.1
-                #self.car_color = (255, 0, 0)
+                self.car_color = (0, 0, 255)
+        else:
+            self.car_color = (0, 255, 0)
+            self.speed = min(self.initial_speed, self.speed + acceleration*dt)
     
     def detect_future_collision(self, dt: float, carList: list["Car"]) -> bool:
         # --- Tunable parameters ---
@@ -142,6 +170,52 @@ class Car:
             
         return False
             
+
+    def zipper_merge_complex(self, dt: float, carList: list["Car"]) -> None:
+        # --- Tunable parameters ---
+        safety_distance   = self.size * 2.0   # Minimum gap we want to maintain
+        max_speed         = self.initial_speed
+        acceleration      = 0.0002  # How quickly we speed up (units per dt)
+        deceleration      = 0.0001  # How quickly we slow down (units per dt)
+        stop_threshold    = 0.01   # If safe speed is below this, come to a full stop
+        lateral_threshold = self.size * 1.2  # How wide the lane is considered (adjust as needed)
+
+        # By default, assume we can go as fast as we like
+        desired_speed = max_speed
+
+        # Vector representing our travel direction
+        dir_self = self.direction  # Already normalized
+
+        future_self = self.position + dir_self * 30
+
+        collision = False
+
+        for other in carList:
+            if other is self:
+                continue
+            
+            if other.lane != self.lane:
+                future_position_self  = np.array([self.position[0], 0.0], dtype=float) + (self.direction * max(10, self.speed*300))
+                future_position_other = np.array([other.position[0], 0], dtype=float)
+            else:
+                future_position_self  = self.position + (self.direction * 40)
+                future_position_other = other.position
+
+            distance_prediction = np.linalg.norm(future_position_self - future_position_other)
+
+            if (distance_prediction < safety_distance):
+                collision = True
+
+        if (collision):
+            self.speed = max(0.0, self.speed - deceleration*dt)
+            if self.speed == 0.0:
+                self.car_color = (255, 0, 0)
+            else:
+                self.car_color = (0, 0, 255)
+        else:
+            self.car_color = (0, 255, 0)
+            self.speed = min(self.initial_speed, self.speed + acceleration*dt)
+
 
     def zipper_merge_simple(self, dt: float, carList: list["Car"]) -> None:
         """
@@ -229,11 +303,11 @@ class Car:
         self._follow_waypoints()
         self._move(dt)
         
-        if (self.position[0] > self.merging_start_point):
+        if (self.position[0] > self.merging_start_point and self.current_waypoint < 2):
             #self.prevent_collision_simple(dt, carList)
-            # self.traffic_light_simple(dt, carList, light_status)
-            self.zipper_merge_simple(dt, carList)
-            # self.bidding_system(dt, carList)
+            #self.traffic_light_simple(dt, carList, light_status)
+            self.zipper_merge_complex(dt, carList)
+            #self.bidding_system(dt, carList)
         else:
             self.prevent_collision_simple(dt, carList)
         #self.prevent_collision(dt, carList)

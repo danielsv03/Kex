@@ -107,7 +107,7 @@ def finalize_stddev(n, M2):
     return math.sqrt(variance)
 
 def save_metrics_to_csv(filename="Datasets/Zipper.csv"):
-   """Saves all evaluation metrics to a CSV file."""
+   """Saves all evaluation metr ics to a CSV file."""
    
    global Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count
 
@@ -129,7 +129,7 @@ def is_clear(spawn_pos, lane: int):
         for car in cars:
             if car.lane != lane:
                continue
-            if abs(car.position[0] - spawn_pos[0]) < carSize:  # Check if too close
+            if abs(car.position[0] - spawn_pos[0]) < carSize*3:  # Check if too close
                 return False
         return True
 
@@ -266,10 +266,10 @@ def update(dt):
    
    and this will scale your velocity based on time. Extend as necessary."""
 
-   spawnCars(0.1)
-   # traffic_light(dt)
-   traffic_light_priority()
-   # bidding_algorithm(dt, cars)
+   spawnCars(0.02)
+   traffic_light(dt)
+   #traffic_light_priority()
+   #bidding_algorithm(dt, cars)
       # traffic_light_priority()
 
    for car in cars:
@@ -362,10 +362,11 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
+  SIMULATION_SPEED = 1
   while True: # Loop forever!
-    update(dt) # You can update/draw here, I've just moved the code for neatness.
+    for _ in range(SIMULATION_SPEED):
+      update(dt) # You can update/draw here, I've just moved the code for neatness.
     draw(screen)
-    
-    dt = fpsClock.tick(fps) * 5
+    dt = fpsClock.tick(fps)
 
 runPyGame()
