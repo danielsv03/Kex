@@ -4,7 +4,6 @@ import time
 from pygame.locals import *
 
 class Car:
-    car_id: int
     speed: int
     initial_speed: int
     direction: np.ndarray
@@ -21,11 +20,11 @@ class Car:
     stopped_timestamp: int
     last_stop_duration: int
     elapsed_time: int
+    heuristic: str
 
 
-    def __init__(self, car_id: int,speed=0, size=25, position=(0,0), waypoints=[[0,0]], lane=1, merging_start_point=0.0):
+    def __init__(self ,speed=0, size=25, position=(0,0), waypoints=[[0,0]], lane=1, merging_start_point=0.0, heuristic="none"):
         self.speed = speed
-        self.car_id = car_id
         self.size = size
         self.position = np.array(position, dtype=float)
         self.waypoints = waypoints
@@ -40,6 +39,7 @@ class Car:
         self.elapsed_time = 0
         self.stopped_timestamp = 0
         self.last_stop_duration = 0
+        self.heuristic = heuristic
 
     def _normalize (self, vector: tuple) -> np.ndarray:
         vector = np.array(vector, dtype=float)
@@ -67,10 +67,8 @@ class Car:
         distance_to_light = np.linalg.norm(self.position - self.waypoints[1])
 
         if (distance_to_light < 40 and light_status != self.lane):
-            #self.speed = 0
             self.prevent_collision_simple(dt, carList, [self.waypoints[1]])
         else:
-            #self.speed = self.initial_speed
             self.prevent_collision_simple(dt, carList)
 
     def bidding_system(self, dt: float, carList: list["Car"]) -> None:
@@ -78,13 +76,10 @@ class Car:
 
         if (distance_to_merge < 40):
             if (self.allowed_to_go):
-                #self.speed = self.initial_speed
                 self.prevent_collision_simple(dt, carList)
                 return
-            #self.speed = 0
             self.prevent_collision_simple(dt, carList, [self.waypoints[1]])
         else:
-            #self.speed = self.initial_speed
             self.prevent_collision_simple(dt, carList)
 
 
@@ -95,14 +90,8 @@ class Car:
         """
         # --- Tunable parameters ---
         safety_distance   = self.size * 2.0   # Minimum gap we want to maintain
-        max_speed         = self.initial_speed
         acceleration      = 0.0002  # How quickly we speed up (units per dt)
         deceleration      = 0.0005  # How quickly we slow down (units per dt)
-        stop_threshold    = 0.01   # If safe speed is below this, come to a full stop
-        lateral_threshold = self.size * 1.2  # How wide the lane is considered (adjust as needed)
-
-        # By default, assume we can go as fast as we like
-        desired_speed = max_speed
 
         # Vector representing our travel direction
         dir_self = self.direction  # Already normalized
@@ -141,13 +130,6 @@ class Car:
     def detect_future_collision(self, dt: float, carList: list["Car"]) -> bool:
         # --- Tunable parameters ---
         safety_distance = self.size * 2    # Distance threshold to begin slowing down
-        max_speed       = self.initial_speed            # Desired maximum speed when unimpeded
-        acceleration    = 0.0001             # How quickly the car accelerates/decelerates
-        stop_threshold  = 0.005            # If computed safe speed is < this, we treat it as 0
-        
-        # We'll figure out the desired speed based on the nearest car conflict.
-        # Start by assuming we can go max speed, then reduce if needed.
-        desired_speed = max_speed
         
         for car in carList:
             if car is self:
@@ -232,65 +214,6 @@ class Car:
             self.speed = max(self.speed - acceleration * dt, desired_speed)
 
 
-    def zipper_merge_simple(self, dt: float, carList: list["Car"]) -> None:
-        """
-        Adjusts speed dynamically based on distance to other cars in the same or adjacent lanes.
-        Cars accelerate if space is free, slow down proportionally if another car is close,
-        and only stop completely if absolutely necessary.
-        """
-        # If we haven't reached the correct waypoint, just run the basic collision avoidance.
-        
-        # --- Tunable parameters ---
-        safety_distance = self.size * 2    # Distance threshold to begin slowing down
-        max_speed       = self.initial_speed            # Desired maximum speed when unimpeded
-        acceleration    = 0.001             # How quickly the car accelerates/decelerates
-        stop_threshold  = 0.005            # If computed safe speed is < this, we treat it as 0
-        
-        # We'll figure out the desired speed based on the nearest car conflict.
-        # Start by assuming we can go max speed, then reduce if needed.
-        desired_speed = max_speed
-        
-        for car in carList:
-            if car is self:
-                continue
-            
-            # Predict future positions. If different lane, only track x-axis.
-            if car.lane != self.lane:
-                future_position_self  = np.array([self.position[0], 0.0], dtype=float) \
-                                    + (self.direction * self.speed * 300)
-                future_position_other = np.array([car.position[0], 0], dtype=float)
-            else:
-                future_position_self  = self.position + (self.direction * self.speed * 300)
-                future_position_other = car.position
-            
-            distance = np.linalg.norm(future_position_self - future_position_other)
-            
-            # If the distance is below the "safety_distance," reduce speed proportionally
-            # so that distance / safety_distance gives a fraction in [0..1].
-            if distance < safety_distance:
-                # Speed limit based on how close we are:
-                #   closer -> fraction goes toward 0,
-                #   at safe distance -> fraction ~ 1 (no slowdown).
-                fraction_of_safe = distance / float(safety_distance)
-                
-                # Compute the maximum allowed speed we can safely travel.
-                safe_speed = fraction_of_safe * max_speed
-                
-                # If it's extremely low, treat as a stop condition.
-                if safe_speed < stop_threshold:
-                    safe_speed = 0
-                
-                # Among all cars, pick the *minimum* safe speed — the strongest constraint.
-                desired_speed = min(desired_speed, safe_speed)
-        
-        # Smoothly move current speed to desired speed:
-        if self.speed < desired_speed:
-            # Accelerate up to desired_speed
-            self.speed = min(self.speed + acceleration * dt, desired_speed)
-        else:
-            # Decelerate down to desired_speed
-            self.speed = max(self.speed - acceleration * dt, desired_speed)
-
     def change_direction(self, new_direction: tuple) -> None:
         self.direction = self._normalize(new_direction)
 
@@ -320,14 +243,17 @@ class Car:
         self._move(dt)
         
         if (self.position[0] > self.merging_start_point and self.current_waypoint < 2):
-            #self.prevent_collision_simple(dt, carList)
-            # self.traffic_light_simple(dt, carList, light_status)
-            self.zipper_merge_complex(dt, carList)
-            # self.bidding_system(dt, carList)
+            match self.heuristic:
+                case "Zipper":
+                    self.zipper_merge_complex(dt, carList)
+                case "TimeBased":
+                    self.traffic_light_simple(dt, carList, light_status)
+                case "PriorityBased":
+                    self.traffic_light_simple(dt, carList, light_status)
+                case "AuctionBased":
+                    self.bidding_system(dt, carList)
         else:
             self.prevent_collision_simple(dt, carList)
-        #self.prevent_collision(dt, carList)
-        #self.zipper_merge_simple(dt, carList)
     
         if (self.last_stop_duration > 0):
             self.last_stop_duration = 0     # Reset last stop time after 1 tick

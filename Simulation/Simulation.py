@@ -10,8 +10,9 @@ import random
 import csv
 
 from Car import Car
+# One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
+CURRENT_HEURISTIC = "Zipper"
 
-highest_id = 0
 width, height = 1500, 1000
 carSize = 20
 roadCenter = [width/1.5, height/2] # The center point of the road
@@ -103,7 +104,7 @@ def finalize_stddev(n, M2):
     variance = M2 / (n - 1)
     return math.sqrt(variance)
 
-def save_metrics_to_csv(filename="Datasets/Zipper.csv"):
+def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+".csv"):
    """Saves all evaluation metr ics to a CSV file."""
    
    global Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count
@@ -132,7 +133,6 @@ def is_clear(spawn_pos, lane: int):
 
 def spawnCars(rate: float):
     """Spawns cars at the beginning of each lane based on rate with randomness."""
-    global highest_id
     
     # Random chance to spawn a new car (controlled by rate)
     if random.random() > rate:
@@ -152,13 +152,12 @@ def spawnCars(rate: float):
     start = roadCenter[0]/2
 
     if (random.randint(1,2) == 1):
-       highest_id += 1
        if is_clear(bottom_lane_spawn, 1):
-          cars.append(Car(highest_id,speed, carSize, bottom_lane_spawn, bottomLaneWaypoints, 1, start))
+          cars.append(Car(speed, carSize, bottom_lane_spawn, bottomLaneWaypoints, 1, start, CURRENT_HEURISTIC))
     else:
         if is_clear(upper_lane_spawn, 2):
           highest_id += 1
-          cars.append(Car(highest_id ,speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start))
+          cars.append(Car(speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start, CURRENT_HEURISTIC))
 
 def find_first_colliding_car(dt, carList: list[Car]) -> int:
    max_x = 0
@@ -265,9 +264,16 @@ def update(dt):
 
    Elapsed_time += dt / 1000
    spawnCars(0.04)
-   traffic_light(dt)
-   # traffic_light_priority()
-   # bidding_algorithm(dt, cars)
+
+
+   match CURRENT_HEURISTIC:
+      case "TimeBased":
+         traffic_light(dt)
+      case "PriorityBased":
+         traffic_light_priority()
+      case "AuctionBased":
+         bidding_algorithm(dt, cars)
+
 
    for car in cars:
       car.update(dt, cars, traffic_light_status)
@@ -359,7 +365,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 20
+  SIMULATION_SPEED = 2
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
