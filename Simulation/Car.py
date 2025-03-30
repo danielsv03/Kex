@@ -200,7 +200,7 @@ class Car:
                 # If it's extremely low, treat as a stop condition.
                 if safe_speed < stop_threshold:
                     safe_speed = 0
-                    self.car_color = (255, 0, 0)
+                    
                 
                 # Among all cars, pick the *minimum* safe speed — the strongest constraint.
                 desired_speed = min(desired_speed, safe_speed)
@@ -213,6 +213,9 @@ class Car:
             # Decelerate down to desired_speed
             self.speed = max(self.speed - acceleration * dt, desired_speed)
 
+        if self.speed == 0.0:
+            self.car_color = (255, 0, 0)
+            
 
     def change_direction(self, new_direction: tuple) -> None:
         self.direction = self._normalize(new_direction)

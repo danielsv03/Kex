@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "Zipper"
+CURRENT_HEURISTIC = "TimeBased"
 
 width, height = 1500, 1000
 carSize = 20
@@ -156,16 +156,7 @@ def spawnCars(rate: float):
           cars.append(Car(speed, carSize, bottom_lane_spawn, bottomLaneWaypoints, 1, start, CURRENT_HEURISTIC))
     else:
         if is_clear(upper_lane_spawn, 2):
-          highest_id += 1
           cars.append(Car(speed, carSize, upper_lane_spawn, upperLaneWaypoints, 2, start, CURRENT_HEURISTIC))
-
-def find_first_colliding_car(dt, carList: list[Car]) -> int:
-   max_x = 0
-   #current_car: int = None
-   for car in carList:
-      if (car.detect_future_collision(dt, carList) and car.position[0] > max_x):
-         max_x = car.position[0]
-   return max_x
 
 def bidding_algorithm(dt, carList: list[Car]) -> None:
    global allowed_cars
