@@ -319,21 +319,18 @@ def draw(screen):
    """
    screen.fill((255, 255, 255)) # Fill the screen with black.
 
-   rect_color = (255, 0, 0)  # Red
-
    drawRoad(screen)
 
    for car in cars:
       car.draw(screen)
 
    # Display variable values in the top-left corner
-   if (len(Throughput_tot) * len(Avg_waitingtime) * len(Avg_stoptime) * len(Stop_count) * len(Fairness) * len(Stability) > 0):
-      draw_text(screen, f"Throughput: {Throughput_tot[-1]} vehicles/sec", (10, 10))
-      draw_text(screen, f"Average Waiting Time: {Avg_waitingtime[-1]} sec/vehicle", (10, 40))
-      draw_text(screen, f"Average Stop Time: {Avg_stoptime[-1]} sec/vehicle", (10, 70))
-      draw_text(screen, f"Stop Count: {Stop_count[-1]} stops", (10, 100))
-      draw_text(screen, f"Fairness: {Fairness[-1]} (Lane 1: {Throughput_l1}, Lane 2: {Throughput_l2})", (10, 130))
-      draw_text(screen, f"Traffic Stability: {Stability[-1]}", (10, 160))
+   draw_text(screen, f"Throughput: {Throughput_tot[-1] if len(Throughput_tot) > 0 else 0} vehicles/sec", (10, 10))
+   draw_text(screen, f"Average Waiting Time: {Avg_waitingtime[-1] if len(Avg_waitingtime) > 0 else 0} sec/vehicle", (10, 40))
+   draw_text(screen, f"Average Stop Time: {Avg_stoptime[-1] if len(Avg_stoptime) > 0 else 0} sec/vehicle", (10, 70))
+   draw_text(screen, f"Stop Count: {Stop_count[-1] if len(Stop_count) > 0 else 0} stops", (10, 100))
+   draw_text(screen, f"Fairness: {Fairness[-1] if len(Fairness) > 0 else 0} (Lane 1: {Throughput_l1}, Lane 2: {Throughput_l2})", (10, 130))
+   draw_text(screen, f"Traffic Stability: {Stability[-1] if len(Stability) > 0 else 0}", (10, 160))
    
    # Flip the display so that the things we drew actually show up.
    pygame.display.flip()
@@ -356,7 +353,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 2
+  SIMULATION_SPEED = 1
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
