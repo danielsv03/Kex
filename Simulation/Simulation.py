@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "TimeBased"
+CURRENT_HEURISTIC = "AuctionBased"
 
 width, height = 1500, 1000
 carSize = 20
@@ -45,6 +45,7 @@ Car_speeds_last = 0
 Car_speeds_mean = 0
 Car_speeds_sq = 0
 Elapsed_time = 0
+ticks = 0
 
 merging_start_point = roadCenter[0]/2
 
@@ -82,6 +83,8 @@ def update_metrics():
    # Avg stop time
    if (Stop_times_count != 0):
       Avg_stoptime.append(round(Stop_times_sum / Stop_times_count, 2))
+   else:
+      Avg_stoptime.append(0)
 
    # Stop count
    Stop_count.append(Stops)
@@ -105,9 +108,7 @@ def finalize_stddev(n, M2):
     return math.sqrt(variance)
 
 def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+".csv"):
-   """Saves all evaluation metr ics to a CSV file."""
-   
-   global Throughput, Avg_waitingtime, Avg_stoptime, Fairness, Stability, Collision_count
+   """Saves all evaluation metrics to a CSV file."""
 
    # Open file in write mode (overwrite if exists)
    with open(filename, "w", newline="") as file:
@@ -242,7 +243,7 @@ def drawRoad(screen):
   #  pygame.draw.line(screen, (255,0,0), (stopLine[0], stopLine[1]), (stopLine[2], stopLine[3]), 2)
 
 def update(dt):
-   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last, Elapsed_time
+   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last, Elapsed_time, ticks
    """
    Update game. Called once per frame.
    dt is the amount of time passed since last frame.
@@ -254,7 +255,7 @@ def update(dt):
    and this will scale your velocity based on time. Extend as necessary."""
 
    Elapsed_time += dt / 1000
-   spawnCars(0.04)
+   spawnCars(0.07)
 
 
    match CURRENT_HEURISTIC:
@@ -295,6 +296,12 @@ def update(dt):
       
       update_metrics()
   
+   ticks = ticks + 1
+   if (ticks > 60000):
+      save_metrics_to_csv()
+      pygame.quit()
+      sys.exit()
+
    # Go through events that are passed to the script by the window.
    for event in pygame.event.get():
       # We need to handle these events. Initially the only one you'll want to care
@@ -331,6 +338,7 @@ def draw(screen):
    draw_text(screen, f"Stop Count: {Stop_count[-1] if len(Stop_count) > 0 else 0} stops", (10, 100))
    draw_text(screen, f"Fairness: {Fairness[-1] if len(Fairness) > 0 else 0} (Lane 1: {Throughput_l1}, Lane 2: {Throughput_l2})", (10, 130))
    draw_text(screen, f"Traffic Stability: {Stability[-1] if len(Stability) > 0 else 0}", (10, 160))
+   draw_text(screen, f"Simulation complete: {round(ticks * 100 / 60000, 1)}%", (10, 190))
    
    # Flip the display so that the things we drew actually show up.
    pygame.display.flip()
@@ -353,7 +361,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 1
+  SIMULATION_SPEED = 15
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
