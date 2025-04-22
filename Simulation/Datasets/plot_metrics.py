@@ -9,11 +9,11 @@ def main():
     # Otherwise, the index of the DataFrame is used.)
     metrics = [
         "Throughput",
-        "Avg Waiting Time",
-        "Avg Stop Time",
+        "Avg Passing Time",
+        "Avg Stationary Duration",
         "Stop Count",
         "Fairness",
-        "Stability (Speed deviation)"
+        "Stability (Speed Deviation)"
     ]
     
     # Dictionary to hold DataFrames for each CSV file.

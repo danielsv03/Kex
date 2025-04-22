@@ -94,9 +94,12 @@ def update_metrics():
       Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
 
    # Stability (Welfords algorithm)
-   Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
-   Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
-   Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
+   if (Car_speeds_count != 0):
+      Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
+      Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
+      Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
+   else:
+      Stability.append(0)
 
 def JainsFariness(val1, val2):
    return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
@@ -115,7 +118,7 @@ def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+".csv"):
       writer = csv.writer(file)
 
       # Write header row
-      writer.writerow(["Time Step", "Throughput", "Avg Waiting Time", "Avg Stop Time", "Stop Count", "Fairness", "Stability (Speed deviation)"])
+      writer.writerow(["Time Step", "Throughput", "Avg Passing Time", "Avg Stationary Duration", "Stop Count", "Fairness", "Stability (Speed Deviation)"])
 
       # Write data (Each row contains values from the same time step)
       for i, (t, wait, stoptm, stop, fair, stab) in enumerate(zip(Throughput_tot, Avg_waitingtime, Avg_stoptime, Stop_count, Fairness, Stability)):
@@ -255,7 +258,7 @@ def update(dt):
    and this will scale your velocity based on time. Extend as necessary."""
 
    Elapsed_time += dt / 1000
-   spawnCars(0.07)
+   spawnCars(0.1)
 
 
    match CURRENT_HEURISTIC:
@@ -294,10 +297,10 @@ def update(dt):
 
          cars.remove(car)
       
-      update_metrics()
+   update_metrics()
   
    ticks = ticks + 1
-   if (ticks > 60000):
+   if (ticks == 60000):
       save_metrics_to_csv()
       pygame.quit()
       sys.exit()
@@ -361,7 +364,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 15
+  SIMULATION_SPEED = 10
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
