@@ -11,7 +11,14 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "Zipper"
+CURRENT_HEURISTIC = "AuctionBased"
+run_count = 0
+if (len(sys.argv) < 2):
+   run_count = 1
+else:
+   run_count = int(sys.argv[1])
+
+print("Run count: " + str(run_count))
 
 width, height = 1500, 1000
 carSize = 20
@@ -111,7 +118,7 @@ def finalize_stddev(n, M2):
     variance = M2 / (n - 1)
     return math.sqrt(variance)
 
-def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+".csv"):
+def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+"_"+str(run_count)+".csv"):
    """Saves all evaluation metrics to a CSV file."""
 
    # Open file in write mode (overwrite if exists)
@@ -326,7 +333,7 @@ def update(dt):
       update_metrics()
   
    ticks = ticks + 1
-   if (ticks > 60000):
+   if (ticks > 6000):
       save_metrics_to_csv()
       pygame.quit()
       sys.exit()
@@ -390,7 +397,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 2
+  SIMULATION_SPEED = 15
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
