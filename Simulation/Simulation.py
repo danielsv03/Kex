@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "AuctionBased"
+CURRENT_HEURISTIC = "Zipper"
 
 width, height = 1500, 1000
 carSize = 20
@@ -20,6 +20,10 @@ roadWidth = 50 # The width of the road
 traffic_light_status = 1
 traffic_light_speed = 10
 traffic_light_acc = 0.0
+traffic_light_delay = 0.0
+traffic_light_prev = 3
+prev_cound = 0
+traffic_light_green_time = 0.0
 
 # Evaluation metrics
 Throughput_tot = []
@@ -94,12 +98,9 @@ def update_metrics():
       Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
 
    # Stability (Welfords algorithm)
-   if (Car_speeds_count != 0):
-      Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
-      Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
-      Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
-   else:
-      Stability.append(0)
+   Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
+   Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
+   Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
 
 def JainsFariness(val1, val2):
    return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
@@ -118,7 +119,7 @@ def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+".csv"):
       writer = csv.writer(file)
 
       # Write header row
-      writer.writerow(["Time Step", "Throughput", "Avg Passing Time", "Avg Stationary Duration", "Stop Count", "Fairness", "Stability (Speed Deviation)"])
+      writer.writerow(["Time Step", "Throughput", "Avg Waiting Time", "Avg Stop Time", "Stop Count", "Fairness", "Stability (Speed deviation)"])
 
       # Write data (Each row contains values from the same time step)
       for i, (t, wait, stoptm, stop, fair, stab) in enumerate(zip(Throughput_tot, Avg_waitingtime, Avg_stoptime, Stop_count, Fairness, Stability)):
@@ -207,36 +208,61 @@ def bidding_algorithm(dt, carList: list[Car]) -> None:
                car.car_color = (0, 0, 255)
                car.allowed_to_go = False
 
-def traffic_light_priority():
-   global traffic_light_status
-   up_count = 0
-   down_count = 0
-   for car in cars:
-      if (car.position[0] < car.merging_start_point):
-         continue
-      if (car.lane == 1):
-         up_count += 1
-      elif (car.lane ==2):
-         down_count += 1
-      else:
-         continue
-   if (up_count > down_count):
-      traffic_light_status = 1
-   else:
-      traffic_light_status = 2
+def traffic_light_priority(dt):
+    global traffic_light_status, traffic_light_prev
+    global traffic_light_acc, traffic_light_delay, traffic_light_green_time
+
+    traffic_light_green_time += dt
+
+    up_count = 0
+    down_count = 0
+
+    for car in cars:
+        if car.position[0] < car.merging_start_point:
+            continue
+        if car.lane == 1:
+            up_count += 1
+        elif car.lane == 2:
+            down_count += 1
+
+    # Decide desired next status based on car counts
+    desired_status = 1 if up_count > down_count else 2
+
+    if traffic_light_status == 3:
+        # Currently in red-for-all transition
+        traffic_light_delay += dt
+        if traffic_light_delay > 2000:  # 2 seconds of red
+            traffic_light_status = traffic_light_prev
+            traffic_light_delay = 0
+            traffic_light_green_time = 0
+            print(f"Light switched to lane {traffic_light_status}")
+    elif desired_status != traffic_light_status and traffic_light_green_time > 10000:
+        # If 10 seconds have passed on current green, and we want to switch
+        traffic_light_prev = desired_status
+        traffic_light_status = 3  # Red for all
+        traffic_light_delay = 0  # Start red timer
+        print("Switching to red before changing direction.")
 
 def traffic_light(dt):
-   global traffic_light_acc, traffic_light_speed, traffic_light_status
+   global traffic_light_acc, traffic_light_speed, traffic_light_status, traffic_light_delay, traffic_light_prev
    traffic_light_acc = traffic_light_acc + dt
    if (traffic_light_acc > traffic_light_speed*1000):
-      traffic_light_acc = 0
-      
-      if traffic_light_status == 1:
-         traffic_light_status = 2
-         print("2")
-      else:
-         print("1")
-         traffic_light_status = 1
+      traffic_light_delay = traffic_light_delay + dt
+      if (traffic_light_prev == 3):
+         traffic_light_prev = traffic_light_status
+      traffic_light_status = 3
+      if (traffic_light_delay > 2*1000):
+         traffic_light_acc = 0
+         traffic_light_status = traffic_light_prev
+         if traffic_light_status == 1:
+            traffic_light_status = 2
+            print("2")
+         else:
+            print("1")
+            traffic_light_status = 1
+         traffic_light_delay = 0
+         traffic_light_prev = 3
+         
 
 def drawRoad(screen):
   for roadLine in roadBoundaries:
@@ -258,14 +284,14 @@ def update(dt):
    and this will scale your velocity based on time. Extend as necessary."""
 
    Elapsed_time += dt / 1000
-   spawnCars(0.1)
+   spawnCars(0.07)
 
 
    match CURRENT_HEURISTIC:
       case "TimeBased":
          traffic_light(dt)
       case "PriorityBased":
-         traffic_light_priority()
+         traffic_light_priority(dt)
       case "AuctionBased":
          bidding_algorithm(dt, cars)
 
@@ -297,10 +323,10 @@ def update(dt):
 
          cars.remove(car)
       
-   update_metrics()
+      update_metrics()
   
    ticks = ticks + 1
-   if (ticks == 60000):
+   if (ticks > 60000):
       save_metrics_to_csv()
       pygame.quit()
       sys.exit()
@@ -364,7 +390,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 10
+  SIMULATION_SPEED = 2
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
