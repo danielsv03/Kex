@@ -333,7 +333,7 @@ def update(dt):
       update_metrics()
   
    ticks = ticks + 1
-   if (ticks > 6000):
+   if (ticks > 60000):
       save_metrics_to_csv()
       pygame.quit()
       sys.exit()
@@ -397,7 +397,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 10
+  SIMULATION_SPEED = 15
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.

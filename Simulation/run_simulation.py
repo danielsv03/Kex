@@ -3,7 +3,7 @@
 import subprocess
 
 count = 1
-total = 8
+total = 10
 
 while (count <= total):
     script_path = "Simulation.py"
