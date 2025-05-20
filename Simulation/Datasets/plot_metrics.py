@@ -1,3 +1,6 @@
+# Plots graphs from averaged values.
+# Looking for files: AuctionBased.csv, PriorityBased.csv, TimeBased.csv, Zipper.csv
+
 import pandas as pd
 import matplotlib.pyplot as plt
 

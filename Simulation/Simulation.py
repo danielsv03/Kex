@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "AuctionBased"
+CURRENT_HEURISTIC = "Zipper"
 run_count = 0
 if (len(sys.argv) < 2):
    run_count = 1
@@ -126,7 +126,7 @@ def save_metrics_to_csv(filename="Datasets/"+CURRENT_HEURISTIC+"_"+str(run_count
       writer = csv.writer(file)
 
       # Write header row
-      writer.writerow(["Time Step", "Throughput", "Avg Waiting Time", "Avg Stop Time", "Stop Count", "Fairness", "Stability (Speed deviation)"])
+      writer.writerow(["Time Step", "Throughput", "Avg Passing Time", "Avg Stationary Duration", "Stop Count", "Fairness", "Stability (Speed Deviation)"])
 
       # Write data (Each row contains values from the same time step)
       for i, (t, wait, stoptm, stop, fair, stab) in enumerate(zip(Throughput_tot, Avg_waitingtime, Avg_stoptime, Stop_count, Fairness, Stability)):
@@ -350,7 +350,7 @@ def update(dt):
          # on other operating systems too, but I don't know for sure.
          # Handle other events as you wish.
 
-def draw_text(screen, text, position, font_size=24, color=(0, 0, 0)):
+def draw_text(screen, text, position, font_size=32, color=(0, 0, 0)):
     """Helper function to draw text on the screen."""
     font = pygame.font.Font(None, font_size)  # Use default font
     text_surface = font.render(text, True, color)
@@ -397,7 +397,7 @@ def runPyGame():
   
   # Main game loop.
   dt = 1/fps # dt is the time since last frame.
-  SIMULATION_SPEED = 15
+  SIMULATION_SPEED = 10
   while True: # Loop forever!
     for _ in range(SIMULATION_SPEED):
       update(dt) # You can update/draw here, I've just moved the code for neatness.
