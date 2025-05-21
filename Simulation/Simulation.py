@@ -338,7 +338,7 @@ def update(dt):
 
          cars.remove(car)
       
-      update_metrics()
+   update_metrics()
   
    ticks = ticks + 1
    if (ticks > 60000):
