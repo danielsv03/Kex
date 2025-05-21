@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "Zipper"
+CURRENT_HEURISTIC = "AuctionBased"
 run_count = 0
 if (len(sys.argv) < 2):
    run_count = 1
@@ -296,7 +296,7 @@ def update(dt):
    and this will scale your velocity based on time. Extend as necessary."""
 
    Elapsed_time += dt / 1000
-   spawnCars(0.1)
+   spawnCars(0.01)
 
 
    match CURRENT_HEURISTIC:
