@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "Zipper"
+CURRENT_HEURISTIC = "TimeBased"
 run_count = 0
 if (len(sys.argv) < 2):
    run_count = 1
