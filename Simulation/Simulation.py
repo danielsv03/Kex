@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "TimeBased"
+CURRENT_HEURISTIC = "PriorityBased"
 run_count = 0
 if (len(sys.argv) < 2):
    run_count = 1
@@ -109,9 +109,10 @@ def update_metrics():
       Fairness.append(round(JainsFariness(round(Passing_durations_l1 / Passing_durations_l1_count, 2), round(Passing_durations_l2 / Passing_durations_l2_count, 2)), 2))
 
    # Stability (Welfords algorithm)
-   Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
-   Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
-   Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
+   if (Car_speeds_count != 0):
+      Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
+      Car_speeds_sq += (Car_speeds_mean - Car_speeds_last)**2
+      Stability.append(round(finalize_stddev(Car_speeds_count, Car_speeds_sq) * 100, 3))
 
 def JainsFariness(val1, val2):
    return (val1 + val2)**2 / (2 * (val1**2 + val2**2))
