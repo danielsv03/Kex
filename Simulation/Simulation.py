@@ -11,7 +11,7 @@ import csv
 
 from Car import Car
 # One of: "Zipper", "TimeBased", "PriorityBased", "AuctionBased"
-CURRENT_HEURISTIC = "Zipper"
+CURRENT_HEURISTIC = "AuctionBased"
 run_count = 0
 if (len(sys.argv) < 2):
    run_count = 1
@@ -45,6 +45,10 @@ Passed_cars_l1 = 0
 Passed_cars_l2 = 0
 Throughput_l1 = 0
 Throughput_l2 = 0
+Passing_durations_l1 = 0
+Passing_durations_l2 = 0
+Passing_durations_l1_count = 0
+Passing_durations_l2_count = 0
 Passing_durations_sum = 0
 Passing_durations_count = 0
 Stop_times_sum = 0
@@ -101,8 +105,8 @@ def update_metrics():
    Stop_count.append(Stops)
 
    # Fairness
-   if (Throughput_l1 != 0 and Throughput_l2 != 0):
-      Fairness.append(round(JainsFariness(Throughput_l1, Throughput_l2), 2))
+   if (Passing_durations_l1_count != 0 and Passing_durations_l2_count != 0):
+      Fairness.append(round(JainsFariness(round(Passing_durations_l1 / Passing_durations_l1_count, 2), round(Passing_durations_l2 / Passing_durations_l2_count, 2)), 2))
 
    # Stability (Welfords algorithm)
    Car_speeds_mean = round(Car_speeds_sum / Car_speeds_count, 2)
@@ -279,7 +283,7 @@ def drawRoad(screen):
   #  pygame.draw.line(screen, (255,0,0), (stopLine[0], stopLine[1]), (stopLine[2], stopLine[3]), 2)
 
 def update(dt):
-   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last, Elapsed_time, ticks
+   global cars, Passed_cars_l1, Passed_cars_l2, Stops, Passing_durations_l1, Passing_durations_l1_count, Passing_durations_l2, Passing_durations_l2_count, Passing_durations_count, Passing_durations_sum, Stop_times_count, Stop_times_sum, Car_speeds_sum, Car_speeds_count, Car_speeds_last, Elapsed_time, ticks
    """
    Update game. Called once per frame.
    dt is the amount of time passed since last frame.
@@ -291,7 +295,7 @@ def update(dt):
    and this will scale your velocity based on time. Extend as necessary."""
 
    Elapsed_time += dt / 1000
-   spawnCars(0.07)
+   spawnCars(0.1)
 
 
    match CURRENT_HEURISTIC:
@@ -321,8 +325,12 @@ def update(dt):
          # Increase passed-cars-count
          if (car.origin_lane == 1):
             Passed_cars_l1 += 1
+            Passing_durations_l1 += car.elapsed_time
+            Passing_durations_l1_count += 1
          else:
             Passed_cars_l2 += 1
+            Passing_durations_l2 += car.elapsed_time
+            Passing_durations_l2_count += 1
 
          # Calculate duration for the car to pass
          Passing_durations_sum += car.elapsed_time
@@ -372,7 +380,7 @@ def draw(screen):
    draw_text(screen, f"Average Waiting Time: {Avg_waitingtime[-1] if len(Avg_waitingtime) > 0 else 0} sec/vehicle", (10, 40))
    draw_text(screen, f"Average Stop Time: {Avg_stoptime[-1] if len(Avg_stoptime) > 0 else 0} sec/vehicle", (10, 70))
    draw_text(screen, f"Stop Count: {Stop_count[-1] if len(Stop_count) > 0 else 0} stops", (10, 100))
-   draw_text(screen, f"Fairness: {Fairness[-1] if len(Fairness) > 0 else 0} (Lane 1: {Throughput_l1}, Lane 2: {Throughput_l2})", (10, 130))
+   draw_text(screen, f"Fairness: {Fairness[-1] if len(Fairness) > 0 else 0} (Lane 1: {round(Passing_durations_l1 / Passing_durations_l1_count, 2) if Passing_durations_l1 > 0 else 0}, Lane 2: {round(Passing_durations_l2 / Passing_durations_l2_count, 2) if Passing_durations_l2 > 0 else 0})", (10, 130))
    draw_text(screen, f"Traffic Stability: {Stability[-1] if len(Stability) > 0 else 0}", (10, 160))
    draw_text(screen, f"Simulation complete: {round(ticks * 100 / 60000, 1)}%", (10, 190))
    
